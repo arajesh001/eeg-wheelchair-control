@@ -1,0 +1,188 @@
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
+import mne
+import numpy as np
+
+# =============================================================================
+# LOADING & SETUP
+# =============================================================================
+
+def load_raw_gdf (path:str, eog_channels:list[int]) -> mne.io.Raw:
+    """
+    Imports a gdf file using mne and returns only eeg channels.
+
+    Args:
+    path: string of the file path
+    eog_channels: list of the indices of the eog channels
+
+    Returns:
+    A loaded file as an mne object, which has eeg channels picked
+    
+    """
+
+    raw = mne.io.read_raw_gdf(path, preload=True, eog=eog_channels)
+    raw.pick('eeg')
+    return raw
+
+
+def rename_and_montage(raw:mne.io.Raw)->None:
+    """
+    Sets the montage to standard_1020 and renames the channel labels to match this format
+
+    Args:
+    raw: mne.io.Raw type that needs to be renamed and montaged (must be 22 eeg channels)
+
+    Returns:
+    None
+    
+    """
+    assert len(raw.ch_names) == 22, f"Expected 22 channels, got {len(raw.ch_names)}"
+
+    ch_names_correct = [
+    'Fz',
+    'FC3', 'FC1', 'FCz', 'FC2', 'FC4',
+    'C5', 'C3', 'C1', 'Cz', 'C2', 'C4', 'C6',
+    'CP3', 'CP1', 'CPz', 'CP2', 'CP4',
+    'P1', 'Pz', 'P2', 'POz'
+    ]
+
+    rename_map = {old: new for old, new in zip(raw.ch_names, ch_names_correct)}
+    raw.rename_channels(rename_map)
+
+    montage = mne.channels.make_standard_montage('standard_1020')
+    raw.set_montage(montage, match_case=False, on_missing='ignore')
+    return
+
+
+# =============================================================================
+# PREPROCESSING
+# =============================================================================
+
+def bandpass_filter(raw:mne.io.Raw, low, high, print:bool)->None:
+    """
+    Bandpasses the data to the frequency range [low, high] using a order 5 IIR butterworth filter. 
+
+    Args:
+    raw: mne.io.Raw type that needs to be bandpassed 
+    low: lower bound frequency (Hz)
+    high: upper bound frequency (Hz)
+    print: bool which controls if outputs are printed
+
+    Returns:
+    None
+
+    """
+    raw.filter(l_freq=low, h_freq=high, method='iir', 
+               iir_params=dict(order=5, ftype='butter'), verbose=print)
+    return
+
+def run_ica(raw:mne.io.Raw, n_components:int)->mne.preprocessing.ICA:
+    """
+    Returns a fast ICA object of n_componenets of the data.
+
+    Args:
+    raw: mne.io.Raw type that needs to be ICA'd
+    n_componenets: how many independent sources there are 
+
+    Returns:
+    Fitted mne.preprocessing.ICA object
+    
+    """
+    ica = mne.preprocessing.ICA(n_components=n_components, method='fastica', random_state=42)
+    ica.fit(raw)
+    return ica
+
+def apply_ica(ica:mne.preprocessing.ICA, raw:mne.io.Raw, exclude:list[int])->mne.io.Raw:
+    """
+    Fits ICA into a raw object and excludes the chosen componenets. 
+
+    Args:
+    ica: ica object to fit to raw
+    raw: mne.io.Raw type that needs to be ICA'd
+    exclude: a list of componenet indices to exclude
+
+    Returns:
+    mne.io.Raw object copy with ICA applied and chosen components excluded
+    
+    """
+    ica.exclude = exclude
+    raw_clean = ica.apply(raw.copy())
+    return raw_clean
+
+
+# =============================================================================
+# EPOCHING
+# =============================================================================
+
+def epoch_raw(raw: mne.io.Raw, events: np.ndarray, event_id: dict,
+              tmin: float = 0.5, tmax: float = 4.0) -> mne.Epochs:
+    """
+    Extracts epochs around motor imagery events.
+
+    Args:
+        raw: cleaned mne.io.Raw object (post-ICA)
+        events: events array from mne.events_from_annotations()
+        event_id: dict mapping class names to event codes
+        tmin: epoch start relative to event onset (seconds)
+        tmax: epoch end relative to event onset (seconds)
+
+    Returns:
+        mne.Epochs object with annotations-based rejection applied
+    """
+    epochs = mne.Epochs(
+        raw, events,
+        event_id=event_id,
+        tmin=tmin,
+        tmax=tmax,
+        baseline=None,
+        preload=True,
+        reject_by_annotation=True
+    )
+    return epochs
+
+def compute_tfr(epochs: mne.Epochs,
+                fmin: float = 8.0,
+                fmax: float = 30.0,
+                n_freqs: int = 65,
+                tmin_crop: float = 1.0,
+                tmax_crop: float = 3.5) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Computes Morlet wavelet TFR power and crops edge artifacts.
+
+    Args:
+        epochs: mne.Epochs object [n_epochs, 22, n_times]
+        fmin: lower frequency bound (Hz)
+        fmax: upper frequency bound (Hz)
+        n_freqs: number of frequency bins
+        tmin_crop: crop start after TFR (seconds, relative to event)
+        tmax_crop: crop end after TFR (seconds, relative to event)
+
+    Returns:
+        power: np.ndarray [n_epochs, 22, n_freqs, n_times_cropped]
+        labels: np.ndarray [n_epochs] of integer class labels
+    """
+    freqs = np.linspace(fmin, fmax, n_freqs)
+    n_cycles = freqs / 2.0
+
+    # [n_epochs, 22, n_freqs, n_times]
+    power = mne.time_frequency.tfr_array_morlet(
+        epochs.get_data(),
+        sfreq=epochs.info['sfreq'],
+        freqs=freqs,
+        n_cycles=n_cycles,
+        output='power'
+    )
+
+    # crop edge artifacts along time axis
+    times = epochs.times
+    time_mask = (times >= tmin_crop) & (times <= tmax_crop)
+    power = power[:, :, :, time_mask]
+
+    # integer labels: left=0, right=1, feet=2, tongue=3
+    label_map = {'left_hand': 0, 'right_hand': 1, 'feet': 2, 'tongue': 3}
+    labels = epochs.events[:, 2] - epochs.events[:, 2].min()
+
+    return power, labels
+
