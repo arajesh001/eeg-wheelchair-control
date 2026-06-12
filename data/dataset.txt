@@ -1,0 +1,5 @@
+Dataset was taken from BCI Competition IV, the link to the source is provided below.
+
+URL: https://www.bbci.de/competition/
+
+Dataset Used: 2a -> 18 files; 9 *T (train) and 9 *E (test)
