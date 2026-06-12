@@ -111,6 +111,25 @@ def apply_ica(ica:mne.preprocessing.ICA, raw:mne.io.Raw, exclude:list[int])->mne
     raw_clean = ica.apply(raw.copy())
     return raw_clean
 
+def get_motor_events(raw: mne.io.Raw) -> tuple[np.ndarray, dict]:
+    """
+    Extracts motor imagery events from a cleaned Raw object.
+
+    Args:
+        raw: cleaned mne.io.Raw object (post-ICA)
+
+    Returns:
+        events: np.ndarray of shape [n_events, 3]
+        motor_event_id: dict mapping motor imagery class names to event codes
+    """
+    events, event_id = mne.events_from_annotations(raw)
+    motor_event_id = {
+        'left_hand':  event_id['769'],
+        'right_hand': event_id['770'],
+        'feet':       event_id['771'],
+        'tongue':     event_id['772'],
+    }
+    return events, motor_event_id
 
 # =============================================================================
 # EPOCHING
