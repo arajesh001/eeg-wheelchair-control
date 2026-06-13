@@ -75,9 +75,37 @@ def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf") -> tuple[np.n
 
     return final_tensor, labels
 
+def build_dataset(subject_ids: list[int], data_dir: str = "BCICIV_2a_gdf") -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Runs the full preprocessing pipeline across all specified subjects &
+    concatenates into single dataset. Tracks subject identity per
+    epoch to support LOSO cross validation.
 
-def build_dataset(data_dir: str, subject_ids: list[int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    pass
+    Args:
+        subject_ids: list of subject ids to include
+        data_dir: default BCICIV_2a_gdf
+
+    Returns:
+        X: np.ndarray [total_epochs, 22, n_freqs, n_times]
+        y: np.ndarray [total_epochs] integer class labels
+        subjects: np.ndarray [total_epochs] subject ID/epoch
+    """
+    X_list = []
+    y_list = []
+    subject_list = []
+
+    for subject_id in subject_ids:
+        power, labels = load_subject(subject_id, data_dir=)
+        X_list.append(power)
+        y_list.append(labels)
+        subject_list.extend([subject_id] * len(power))
+
+    X = np.concatenate(X_list, axis=0)
+    y = np.concatenate(y_list, axis=0)
+    subjects = np.array(subject_list)
+
+    return X, y, subjects
+
 
 def split_dataset(X: np.ndarray, y: np.ndarray, test_size: float, seed: int) -> tuple:
     pass
