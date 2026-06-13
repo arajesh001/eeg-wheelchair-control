@@ -95,7 +95,7 @@ def build_dataset(subject_ids: list[int], data_dir: str = "BCICIV_2a_gdf") -> tu
     subject_list = []
 
     for subject_id in subject_ids:
-        power, labels = load_subject(subject_id, data_dir=)
+        power, labels = load_subject(subject_id, data_dir)
         X_list.append(power)
         y_list.append(labels)
         subject_list.extend([subject_id] * len(power))
