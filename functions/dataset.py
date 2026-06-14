@@ -107,5 +107,47 @@ def build_dataset(subject_ids: list[int], data_dir: str = "BCICIV_2a_gdf") -> tu
     return X, y, subjects
 
 
+def save_dataset(X, y, subjects, save_dir: str = "data/processed") -> None:
+    """
+    Saves the dataset made by build_dataset
+
+    Args:
+    X: np.ndarray [total_epochs, 22, n_freqs, n_times]
+    y: np.ndarray [total_epochs] integer class labels
+    subjects: np.ndarray [total_epochs] subject ID/epoch
+    save_dir: directory to save in ("data/processed" default)
+
+    Returns:
+    None
+
+    """
+    save_path = Path(save_dir)
+    save_path.mkdir(exist_ok=True)
+    np.save(save_path / "X.npy", X)
+    np.save(save_path / "y.npy", y)
+    np.save(save_path / "subjects.npy", subjects)
+
+def load_dataset(save_dir: str = "processed") -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    
+    """
+    Loads the saved dataset
+
+    Args:
+    save_dir: directory with saved processed data ("data/processed" default)
+
+    Returns:
+    X: np.ndarray [total_epochs, 22, n_freqs, n_times]
+    y: np.ndarray [total_epochs] integer class labels
+    subjects: np.ndarray [total_epochs] subject ID/epoch
+    """
+    
+    save_path = Path(save_dir)
+    X = np.load(save_path / "X.npy")
+    y = np.load(save_path / "y.npy")
+    subjects = np.load(save_path / "subjects.npy")
+    return X, y, subjects
+
+
+
 def split_dataset(X: np.ndarray, y: np.ndarray, test_size: float, seed: int) -> tuple:
     pass
