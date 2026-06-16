@@ -147,6 +147,28 @@ def load_dataset(save_dir: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     subjects = np.load(save_path / "subjects.npy")
     return X, y, subjects
 
+def get_loso_split(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
+                   test_subject_id: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Splits dataset into train and test sets using leave-one-subject-out.
+    All epochs from test_subject_id go to test, all others go to train.
 
-def split_dataset(X: np.ndarray, y: np.ndarray, test_size: float, seed: int) -> tuple:
-    pass
+    Args:
+        X: np.ndarray [total_epochs, 22, n_freqs, n_times]
+        y: np.ndarray [total_epochs] integer class labels
+        subjects: np.ndarray [total_epochs] subject ID/epoch
+        test_subject_id: subject to leave out
+
+    Returns:
+        X_train, X_test, y_train, y_test -> np.ndarrays
+    """
+
+    # bool masking -> if == test_subject_id, it goes in test
+    test_mask  = subjects == test_subject_id
+    train_mask = subjects != test_subject_id
+
+    X_train, X_test = X[train_mask], X[test_mask]
+    y_train, y_test = y[train_mask], y[test_mask]
+
+    return X_train, X_test, y_train, y_test
+
