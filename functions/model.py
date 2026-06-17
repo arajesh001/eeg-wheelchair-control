@@ -96,3 +96,16 @@ if __name__ == "__main__":
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
+
+def ndarray_to_tensor(X: np.ndarray) -> torch.Tensor:
+    # float32 -> required by Conv2d
+    return torch.from_numpy(X).float()
+
+def labels_to_tensor(y: np.ndarray) -> torch.Tensor:
+    # int64 -> required by CrossEntropyLoss (see train.py)
+    return torch.from_numpy(y).long()
+
+def get_device() -> torch.device:
+    # use GPU if available -> else CPU
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
