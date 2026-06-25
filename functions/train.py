@@ -13,6 +13,7 @@ from dataset import get_loso_split
 # LOSS FUNCTION
 # =============================================================================
 
+loss_fn = nn.CrossEntropyLoss()
 
 # =============================================================================
 # FUNCTIONS
@@ -43,7 +44,49 @@ def make_dataloader(X: np.ndarray, y: np.ndarray,
 def train(model: EEG_CNN, dataloader: DataLoader, 
           optimizer: torch.optim.Optimizer, 
           loss_fn: nn.Module, device: torch.device) -> float:
-    pass
+    """
+    Runs one full epoch of training over all batches in the dataloader.
+
+    Args:
+        model: EEG_CNN instance in training mode
+        dataloader: batched training data (X, y pairs)
+        optimizer: Adam
+        loss_fn: CrossEntropyLoss 
+        device: cpu or cuda -> from get_device
+
+    Returns:
+        Average loss across all batches for this epoch
+    """
+
+    model.train()
+    running_loss = 0
+
+    for X_batch, y_batch in dataloader:
+        # choose appropriate device
+        X_batch = X_batch.to(device)
+        y_batch = y_batch.to(device)
+
+        # zero grads initially
+        optimizer.zero_grad()
+
+        # get model predictions
+        preds = model(X_batch)
+
+        # compute cross entropy loss
+        loss = loss_fn(preds, y_batch)
+
+        # find the gradients
+        loss.backward()
+
+        # update weights accordingly
+        optimizer.step()
+        
+        # add to running loss
+        running_loss += loss.item()
+    
+    # return avg loss
+    return running_loss / len(dataloader)
+
 
 def evaluate(model: EEG_CNN, dataloader: DataLoader, 
              device: torch.device) -> float:
