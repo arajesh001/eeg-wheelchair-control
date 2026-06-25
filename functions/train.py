@@ -104,7 +104,7 @@ def evaluate(model: EEG_CNN, dataloader: DataLoader,
     """
 
     model.eval()
-    sum = 0
+    correct = 0
     total = 0
 
     # DONT make computational graph here -> save memory
