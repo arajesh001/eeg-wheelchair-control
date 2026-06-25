@@ -129,4 +129,53 @@ def evaluate(model: EEG_CNN, dataloader: DataLoader,
 
 def run_loso(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
              n_epochs: int = 50, batch_size: int = 32) -> tuple[list, float]:
-    pass
+    
+    '''
+    Evaluates model generalization across subjects using LOSO
+    cross validation. Each fold trains on 8 subjects and tests on the held-out
+    subject, repeating for all unique subjects, returning per-subject accuracies
+    and their mean.
+
+    Args:
+        X: [total_epochs, 22, n_freqs, n_times] power arr
+        y: [total_epochs] class labels (0-3)
+        subjects: [total_epochs] subject ID per epoch
+        n_epochs: # of training epochs / fold
+        batch_size: # of samples / batch
+
+    Returns:
+        accuracies: list of per-subject accuracies as decimals
+        mean: mean accuracy across all folds
+    '''
+
+    device = get_device()
+    accuracies = []
+
+    # EDIT: this loop structure prevents div0 error later -> found using test.ipynb
+    for subject_id in np.unique(subjects):
+        # split
+        X_train, X_test, y_train, y_test = get_loso_split(X, y, subjects, subject_id)
+
+        # dataloader
+        train_loader = make_dataloader(X_train, y_train, batch_size, shuffle=True)
+        test_loader  = make_dataloader(X_test,  y_test,  batch_size, shuffle=False)
+
+        # fresh model + optimizer each fold
+        model = EEG_CNN().to(device)
+
+        # Adam optimizer -> best
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+        # train n_epochs
+        for epoch in range(1, n_epochs + 1):
+            loss = train(model, train_loader, optimizer, loss_fn, device)
+            print(epoch, loss)
+        
+        # eval
+        acc = evaluate(model, test_loader, device)
+        print(subject_id, acc)
+        accuracies.append(acc)
+    
+    total = 0
+    mean = np.mean(accuracies)
+    return accuracies, mean
