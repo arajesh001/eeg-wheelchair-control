@@ -172,3 +172,28 @@ def get_loso_split(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
 
     return X_train, X_test, y_train, y_test
 
+def build_and_save_dataset(subject_ids: list[int], 
+                           save_dir: str,
+                           data_dir: str = "BCICIV_2a_gdf") -> None:
+    """
+    Runs the full preprocessing pipeline per subject and saves each one
+    individually to disk immediately after processing. Never accumulates
+    the full dataset in RAM —> peak memory is one subject at a time.
+
+    Args:
+        subject_ids: list of subject ids to process (1-9)
+        save_dir: directory to save /subject files
+        data_dir: directory w/ raw GDF files
+
+    Returns:
+        None
+    """
+    save_path = Path(save_dir)
+    save_path.mkdir(exist_ok=True)
+
+    for subject_id in subject_ids:
+        print(f"processing subject {subject_id}...")
+        power, labels = load_subject(subject_id, data_dir)
+        np.save(save_path / f"subject_{subject_id}_X.npy", power)
+        np.save(save_path / f"subject_{subject_id}_y.npy", labels)
+        print(f"subject {subject_id} saved -> {power.shape}")

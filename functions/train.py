@@ -164,7 +164,7 @@ def run_loso(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
         model = EEG_CNN().to(device)
 
         # Adam optimizer -> best
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 
         # train n_epochs
         for epoch in range(1, n_epochs + 1):
