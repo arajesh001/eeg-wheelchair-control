@@ -80,7 +80,7 @@ def train(model: EEG_CNN, dataloader: DataLoader,
 
         # update weights accordingly
         optimizer.step()
-        
+
         # add to running loss
         running_loss += loss.item()
     
@@ -90,7 +90,42 @@ def train(model: EEG_CNN, dataloader: DataLoader,
 
 def evaluate(model: EEG_CNN, dataloader: DataLoader, 
              device: torch.device) -> float:
-    pass
+    
+    """
+    Runs one full pass over the dataloader w/o gradient tracking.
+
+    Args:
+        model: EEG_CNN 
+        dataloader: batched test data (X, y pairs)
+        device: cpu or cuda
+
+    Returns:
+        Classification accuracy as a decimal (0.0-1.0)
+    """
+
+    model.eval()
+    sum = 0
+    total = 0
+
+    # DONT make computational graph here -> save memory
+    with torch.no_grad():
+        for X_batch, y_batch in dataloader:
+            # choose appropriate device
+            X_batch = X_batch.to(device)
+            y_batch = y_batch.to(device)
+
+            # get preds 
+            preds = model(X_batch)
+
+            # highest score / sample idx returned -> which maps to class (0-3)
+            idx = torch.argmax(preds, dim=1)
+
+            # add to correct and total counts
+            correct += (idx == y_batch).sum().item()
+            total += len(y_batch)
+
+    # return accuracy as a decimal
+    return correct / total
 
 def run_loso(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
              n_epochs: int = 50, batch_size: int = 32) -> tuple[list, float]:
