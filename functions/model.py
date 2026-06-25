@@ -4,6 +4,7 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 # =============================================================================
 # CLASSES
@@ -49,9 +50,9 @@ class EEG_CNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(num_features=64)
 
         # FLATTENING + LINEAR LAYER
-        # Ouput tensor at this stage is [8, 64, 5, 16] (found w/dummy tensor)
-        # So, linear layer needs to be 64 * 5 * 16 = 5120
-        self.fc = nn.Linear(5120, 4)
+        # Output tensor at this stage is [8, 64, 16, 31] (found w/dummy tensor)
+        # So linear layer needs to be 64 * 16 * 31 = 31744
+        self.fc = nn.Linear(31744, 4)
 
         # prevent overfitting w/random deactivation
         self.dropout = nn.Dropout(p=0.5)
@@ -76,7 +77,7 @@ class EEG_CNN(nn.Module):
         x = self.pool(x)
 
         # FLATTENING + LINEAR LAYER 
-        # [8, 5120]
+        # [8, 31744]
         x = torch.flatten(x, start_dim=1)
         x = self.dropout(x)
         # [8, 4]
