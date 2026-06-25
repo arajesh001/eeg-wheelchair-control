@@ -50,9 +50,15 @@ class EEG_CNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(num_features=64)
 
         # FLATTENING + LINEAR LAYER
-        # Output tensor at this stage is [8, 64, 16, 31] (found w/dummy tensor)
-        # So linear layer needs to be 64 * 16 * 31 = 31744
-        self.fc = nn.Linear(31744, 4)
+        # pass a dummy tensor through the conv layers to get the right size
+        with torch.no_grad():
+            dummy = torch.zeros(1, 22, 65, 626)
+            dummy = self.pool(torch.relu(self.bn3(self.conv3(
+            self.pool(torch.relu(self.bn2(self.conv2(
+            torch.relu(self.bn1(self.conv1(dummy)))))))))))
+            flat_size = dummy.flatten(start_dim=1).shape[1]
+
+        self.fc = nn.Linear(flat_size, 4)
 
         # prevent overfitting w/random deactivation
         self.dropout = nn.Dropout(p=0.5)
@@ -77,7 +83,7 @@ class EEG_CNN(nn.Module):
         x = self.pool(x)
 
         # FLATTENING + LINEAR LAYER 
-        # [8, 31744]
+        # [batch, flat_size] —> computed dynamically in __init__
         x = torch.flatten(x, start_dim=1)
         x = self.dropout(x)
         # [8, 4]
@@ -107,6 +113,10 @@ def labels_to_tensor(y: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(y).long()
 
 def get_device() -> torch.device:
-    # use GPU if available -> else CPU
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    # UPDATED FOR MORE OPTIONS
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
