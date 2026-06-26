@@ -2,6 +2,9 @@
 # IMPORTS
 # =============================================================================
 
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
 import mne
 import numpy as np
 
@@ -71,7 +74,7 @@ def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf") -> tuple[np.n
     power, labels = compute_tfr(raw_epochs)
 
     # final tensor log normalized 
-    final_tensor = log_normalize(power)
+    final_tensor = log_normalize(power).astype(np.float32)
 
     return final_tensor, labels
 
@@ -197,3 +200,46 @@ def build_and_save_dataset(subject_ids: list[int],
         np.save(save_path / f"subject_{subject_id}_X.npy", power)
         np.save(save_path / f"subject_{subject_id}_y.npy", labels)
         print(f"subject {subject_id} saved -> {power.shape}")
+
+# modifying dataloader so that it's one subject at a time -> make it easier on RAM
+# original concatenated np array was too much for Mac -> ~10 GB at a time
+class EEGDataset(torch.utils.data.Dataset):
+    """
+    Memory-efficient EEG dataset that loads per-subject .npy files via
+    memory mapping rather than holding the full dataset in RAM at once.
+    """
+    def __init__(self, subject_ids: list[int], data_dir: str):
+        self.subject_ids = subject_ids
+        self.data_dir = data_dir
+        self.X_list = []
+        self.y_list = []
+
+        save_path = Path(data_dir)
+
+        for subject_id in subject_ids:
+            # READS FROM DISK RATHER THAN ALL AT ONCE
+            X = np.load(save_path / f"subject_{subject_id}_X.npy",
+                        mmap_mode="r")
+            y = np.load(save_path / f"subject_{subject_id}_y.npy",
+                        mmap_mode="r")
+
+            self.X_list.append(X)
+            self.y_list.append(y)
+
+        # cumulative epoch counts per subject
+        self.cumulative_sizes = np.cumsum([len(x) for x in self.X_list])
+        self.total = self.cumulative_sizes[-1]
+            
+    def __len__(self):
+        return self.total
+    def __getitem__(self, idx: int):
+        subject_idx = np.searchsorted(self.cumulative_sizes, idx, side='right')
+
+        if subject_idx == 0:
+            local_idx = idx
+        else:
+            local_idx = idx - self.cumulative_sizes[subject_idx - 1]
+        
+        x = torch.from_numpy(self.X_list[subject_idx][local_idx]).float()
+        y = torch.from_numpy(self.y_list[subject_idx][local_idx]).long()
+        return x, y
