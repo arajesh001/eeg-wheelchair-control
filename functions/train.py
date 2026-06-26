@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from model import EEG_CNN, ndarray_to_tensor, labels_to_tensor, get_device
-from dataset import get_loso_split
+from dataset import get_loso_split, EEGDataset
 
 # =============================================================================
 # LOSS FUNCTION
@@ -179,3 +179,36 @@ def run_loso(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
     total = 0
     mean = np.mean(accuracies)
     return accuracies, mean
+
+
+def run_loso_optimized(subject_ids, n_epochs=50, batch_size=32, data_dir="processed_per_subject"):
+    '''
+    Memory-efficient version of run_loso -> uses EEGDataset with mmap loading instead of full arrays.
+    '''    
+    
+    device = get_device()
+    accuracies = []
+
+    for test_subj in subject_ids:
+        train_subjects = [s for s in subject_ids if s != test_subj]
+
+        train_dataset = EEGDataset(train_subjects, data_dir)
+        test_dataset = EEGDataset([test_subj], data_dir)
+
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+        model = EEG_CNN().to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+        for epoch in range(n_epochs):
+            avg_loss = train(model, train_loader, optimizer, loss_fn, device)
+            print(f"[Subject {test_subj}] Epoch {epoch+1}/{n_epochs} | Loss: {avg_loss:.4f}")
+
+        acc = evaluate(model, test_loader, device)
+        print(f"[Subject {test_subj}] Accuracy: {acc:.4f}\n")
+        accuracies.append(acc)
+
+    mean_acc = sum(accuracies) / len(accuracies)
+    print(f"Mean LOSO Accuracy: {mean_acc:.4f}")
+    return accuracies, mean_acc

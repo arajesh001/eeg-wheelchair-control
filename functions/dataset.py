@@ -241,5 +241,5 @@ class EEGDataset(torch.utils.data.Dataset):
             local_idx = idx - self.cumulative_sizes[subject_idx - 1]
         
         x = torch.from_numpy(self.X_list[subject_idx][local_idx]).float()
-        y = torch.from_numpy(self.y_list[subject_idx][local_idx]).long()
+        y = torch.tensor(self.y_list[subject_idx][local_idx]).long()
         return x, y
