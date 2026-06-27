@@ -58,10 +58,12 @@ class EEG_CNN(nn.Module):
             torch.relu(self.bn1(self.conv1(dummy)))))))))))
             flat_size = dummy.flatten(start_dim=1).shape[1]
 
-        self.fc = nn.Linear(flat_size, 4)
+        self.fc1 = nn.Linear(flat_size, 128)
+        self.fc2 = nn.Linear(128, 4)
 
         # prevent overfitting w/random deactivation
         self.dropout = nn.Dropout(p=0.5)
+        self.dropout_conv = nn.Dropout2d(p=0.25)
 
 
     def forward(self, x):
@@ -75,19 +77,27 @@ class EEG_CNN(nn.Module):
         x = self.bn2(x)
         x = torch.relu(x)
         x = self.pool(x)
+        x = self.dropout_conv(x)
 
         # BLOCK 3
         x = self.conv3(x)
         x = self.bn3(x)
         x = torch.relu(x)
         x = self.pool(x)
+        x = self.dropout_conv(x)
 
-        # FLATTENING + LINEAR LAYER 
+        # FLATTENING + LINEAR LAYER 1
         # [batch, flat_size] —> computed dynamically in __init__
         x = torch.flatten(x, start_dim=1)
         x = self.dropout(x)
-        # [8, 4]
-        x = self.fc(x)
+        # [8, 128]
+        x = self.fc1(x)
+        x = torch.relu(x)
+
+        # LINEAR LAYER 2 
+        x = self.dropout(x)
+        x = self.fc2(x)
+
         return x
 
 
