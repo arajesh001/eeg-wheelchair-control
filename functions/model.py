@@ -104,7 +104,7 @@ class EEG_CNN(nn.Module):
 # DUMMY CODE TO TEST IF CNN WORKS
 if __name__ == "__main__":
     model = EEG_CNN()
-    dummy = torch.randn(8, 22, 65, 125)
+    dummy = torch.randn(8, 22, 65, 626)
     out = model(dummy)
     print(out.shape)  
     # ^^ should be [8, 4]
