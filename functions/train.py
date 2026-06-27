@@ -202,8 +202,22 @@ def run_loso_optimized(subject_ids, n_epochs=50, batch_size=32, data_dir="proces
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
         for epoch in range(n_epochs):
+            # adding early stopping
+            best_loss = float('inf')
+            counter = 0
+            patience = 10
+            tol = 0
             avg_loss = train(model, train_loader, optimizer, loss_fn, device)
             print(f"[Subject {test_subj}] Epoch {epoch+1}/{n_epochs} | Loss: {avg_loss:.4f}")
+
+            if avg_loss < best_loss - tol:
+                best_loss = avg_loss
+                counter = 0
+            else:
+                counter += 1
+            if counter >= patience:
+                print(f"[Subject {test_subj}] Early stopping at epoch {epoch+1}")
+                break
 
         acc = evaluate(model, test_loader, device)
         print(f"[Subject {test_subj}] Accuracy: {acc:.4f}\n")
