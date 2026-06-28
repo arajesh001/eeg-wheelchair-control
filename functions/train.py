@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, random_split
 from model import EEG_CNN, ndarray_to_tensor, labels_to_tensor, get_device
 from dataset import get_loso_split, EEGDataset
 
@@ -92,7 +92,7 @@ def evaluate(model: EEG_CNN, dataloader: DataLoader,
              device: torch.device) -> float:
     
     """
-    Runs one full pass over the dataloader w/o gradient tracking.
+    Runs one full pass over the dataloader w/o gradient tracking, returning accuracy. 
 
     Args:
         model: EEG_CNN 
@@ -181,6 +181,40 @@ def run_loso(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
     return accuracies, mean
 
 
+def evaluate_loss(model: EEG_CNN, dataloader: DataLoader, 
+             device: torch.device) -> float:
+    """
+    Runs one full pass over the dataloader w/o gradient tracking, returning loss. 
+
+    Args:
+        model: EEG_CNN 
+        dataloader: batched test data (X, y pairs)
+        device: cpu or cuda
+
+    Returns:
+        Loss as a decimal (0.0-1.0)
+    """
+
+    model.eval()
+
+    total_loss = 0
+    with torch.no_grad():
+        for X_batch, y_batch in dataloader:
+            # choose appropriate device
+            X_batch = X_batch.to(device)
+            y_batch = y_batch.to(device)
+
+            # get preds 
+            preds = model(X_batch)
+
+            # compute loss
+            loss = loss_fn(preds, y_batch)
+            total_loss += loss.item()
+
+    # return avg loss
+    return total_loss / len(dataloader)
+
+
 def run_loso_optimized(subject_ids, n_epochs=50, batch_size=32, data_dir="processed_per_subject"):
     '''
     Memory-efficient version of run_loso -> uses EEGDataset with mmap loading instead of full arrays.
@@ -195,23 +229,30 @@ def run_loso_optimized(subject_ids, n_epochs=50, batch_size=32, data_dir="proces
         train_dataset = EEGDataset(train_subjects, data_dir)
         test_dataset = EEGDataset([test_subj], data_dir)
 
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        # splitting for validation loss
+        train_size = int(0.85 * len(train_dataset))
+        val_size = len(train_dataset) - train_size
+        train_split, val_split = torch.utils.data.random_split(train_dataset, [train_size, val_size])
+
+        train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
         model = EEG_CNN().to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
+        # adding early stopping
+        best_loss = float('inf')
+        counter = 0
+        patience = 10
+        tol = 0.001
         for epoch in range(n_epochs):
-            # adding early stopping
-            best_loss = float('inf')
-            counter = 0
-            patience = 10
-            tol = 0
             avg_loss = train(model, train_loader, optimizer, loss_fn, device)
-            print(f"[Subject {test_subj}] Epoch {epoch+1}/{n_epochs} | Loss: {avg_loss:.4f}")
+            val_loss = evaluate_loss(model, val_loader, device)
+            print(f"[Subject {test_subj}] Epoch {epoch+1}/{n_epochs} | Train Loss: {avg_loss:.4f} | Val Loss: {val_loss:.4f}")
 
-            if avg_loss < best_loss - tol:
-                best_loss = avg_loss
+            if val_loss < best_loss - tol:
+                best_loss = val_loss
                 counter = 0
             else:
                 counter += 1

@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.nn.functional as F
 
 # =============================================================================
 # CLASSES
@@ -14,48 +15,37 @@ class EEG_CNN(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # BLOCK 1 -> spatial filter across freqs 
+        # BLOCK 1 -> temporal filter across time 
         self.conv1 = nn.Conv2d(
             in_channels = 22,
-            out_channels = 16,
-            kernel_size = (5, 1),
-            padding = (2, 0)
+            out_channels = 8,
+            kernel_size = (1, 64),
+            padding = (0, 32)
         )
 
-        self.bn1 = nn.BatchNorm2d(num_features=16)
+        self.bn1 = nn.BatchNorm2d(num_features=8)
 
-        # BLOCK 2 -> temporal filter across time 
+        # BLOCK 2 -> spatial filter across freqs 
         self.conv2 = nn.Conv2d(
-            in_channels = 16,
-            out_channels = 32,
-            kernel_size = (1, 5),
-            padding = (0, 2)
+            in_channels = 8,
+            out_channels = 16,
+            kernel_size = (22, 1),
+            padding = 0
         )
 
-        self.bn2 = nn.BatchNorm2d(num_features=32)
+        self.bn2 = nn.BatchNorm2d(num_features=16)
 
-        self.pool = nn.MaxPool2d(
+        self.pool = nn.AvgPool2d(
             kernel_size = 2,
             stride = 2
         )
-
-        # BLOCK 3 -> learn patterns across freq x time
-        self.conv3 = nn.Conv2d(
-            in_channels = 32,
-            out_channels = 64,
-            kernel_size = (3, 3),
-            padding = (1, 1)
-        )
-
-        self.bn3 = nn.BatchNorm2d(num_features=64)
 
         # FLATTENING + LINEAR LAYER
         # pass a dummy tensor through the conv layers to get the right size
         with torch.no_grad():
             dummy = torch.zeros(1, 22, 65, 626)
-            dummy = self.pool(torch.relu(self.bn3(self.conv3(
-            self.pool(torch.relu(self.bn2(self.conv2(
-            torch.relu(self.bn1(self.conv1(dummy)))))))))))
+            dummy = self.pool(F.elu(self.bn2(self.conv2(
+                F.elu(self.bn1(self.conv1(dummy)))))))
             flat_size = dummy.flatten(start_dim=1).shape[1]
 
         self.fc1 = nn.Linear(flat_size, 128)
@@ -70,19 +60,12 @@ class EEG_CNN(nn.Module):
         # BLOCK 1 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = torch.relu(x)
+        x = F.elu(x)
 
         # BLOCK 2 
         x = self.conv2(x)
         x = self.bn2(x)
-        x = torch.relu(x)
-        x = self.pool(x)
-        x = self.dropout_conv(x)
-
-        # BLOCK 3
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = torch.relu(x)
+        x = F.elu(x)
         x = self.pool(x)
         x = self.dropout_conv(x)
 
@@ -92,7 +75,7 @@ class EEG_CNN(nn.Module):
         x = self.dropout(x)
         # [8, 128]
         x = self.fc1(x)
-        x = torch.relu(x)
+        x = F.elu(x)
 
         # LINEAR LAYER 2 
         x = self.dropout(x)
