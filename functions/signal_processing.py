@@ -9,7 +9,7 @@ import numpy as np
 # LOADING & SETUP
 # =============================================================================
 
-def load_raw_gdf (path:str, eog_channels:list[int]) -> mne.io.Raw:
+def load_raw_gdf (path:str, eog_channels:list[int]) -> tuple[mne.io.Raw, mne.io.Raw]:
     """
     Imports a gdf file using mne and returns only eeg channels.
 
@@ -18,12 +18,9 @@ def load_raw_gdf (path:str, eog_channels:list[int]) -> mne.io.Raw:
     eog_channels: list of the indices of the eog channels
 
     Returns:
-    A loaded file as an mne object, which has eeg channels picked
-    
+    A loaded file as an mne object.
     """
-
     raw = mne.io.read_raw_gdf(path, preload=True, eog=eog_channels)
-    raw.pick('eeg')
     return raw
 
 
@@ -38,7 +35,6 @@ def rename_and_montage(raw:mne.io.Raw)->None:
     None
     
     """
-    assert len(raw.ch_names) == 22, f"Expected 22 channels, got {len(raw.ch_names)}"
 
     ch_names_correct = [
     'Fz',
@@ -91,8 +87,22 @@ def run_ica(raw:mne.io.Raw, n_components:int)->mne.preprocessing.ICA:
     
     """
     ica = mne.preprocessing.ICA(n_components=n_components, method='fastica', random_state=42)
-    ica.fit(raw)
+    ica.fit(raw, picks='eeg')
     return ica
+
+def find_eog_artifacts(ica:mne.preprocessing.ICA, raw:mne.io.Raw)->list[int]:
+    '''
+    Finds channel idx's correlated with eog channels.
+
+    Args:
+    ica: ica object to fit to raw
+    raw: mne.io.Raw type that needs to be ICA'd
+
+    Returns: list of bad channel idx's
+
+    '''
+    eog_indices, _ = ica.find_bads_eog(raw)
+    return eog_indices
 
 def apply_ica(ica:mne.preprocessing.ICA, raw:mne.io.Raw, exclude:list[int])->mne.io.Raw:
     """
@@ -110,6 +120,7 @@ def apply_ica(ica:mne.preprocessing.ICA, raw:mne.io.Raw, exclude:list[int])->mne
     ica.exclude = exclude
     raw_clean = ica.apply(raw.copy())
     return raw_clean
+
 
 def get_motor_events(raw: mne.io.Raw) -> tuple[np.ndarray, dict]:
     """

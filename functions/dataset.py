@@ -10,7 +10,7 @@ import numpy as np
 
 import sys
 from pathlib import Path
-from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter, run_ica, apply_ica, epoch_raw, compute_tfr, get_motor_events
+from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter, run_ica, apply_ica, epoch_raw, compute_tfr, get_motor_events, find_eog_artifacts
 
 # =============================================================================
 # FUNCTIONS
@@ -34,7 +34,7 @@ def log_normalize(power: np.ndarray) -> np.ndarray:
     return (log_power - mean) / (std + epsilon)
 
 
-def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf") -> tuple[np.ndarray, np.ndarray]:
+def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
     """
     Applies full signal processing pipeline (from pipeline.ipynb) to any subject
     in the dataset that is of a "T" (training) file type.
@@ -60,9 +60,17 @@ def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf") -> tuple[np.n
     # run ica
     ica = run_ica(raw, 20)
 
+    # find bad channels
+    eog_indices = find_eog_artifacts(ica, raw)
+
     # IMPORTANT: apply_ica W/O dropping any componenets -> optimize later 
     # after pipeline works since it requires manual inspection
-    raw_clean = apply_ica(ica, raw, [])
+    all_excludes = list(set(eog_indices + manual_exclude))
+    print(f"Subject {subject_id} | auto: {eog_indices} | manual: {manual_exclude} | rejecting: {all_excludes}")
+    raw_clean = apply_ica(ica, raw, all_excludes)
+
+    # drop eog channels 
+    raw_clean.pick('eeg')
 
     # obtaining events and ids 
     events, event_id = get_motor_events(raw_clean)
@@ -177,7 +185,8 @@ def get_loso_split(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
 
 def build_and_save_dataset(subject_ids: list[int], 
                            save_dir: str,
-                           data_dir: str = "BCICIV_2a_gdf") -> None:
+                           data_dir: str = "BCICIV_2a_gdf",
+                           exclude_map: dict = {}) -> None:
     """
     Runs the full preprocessing pipeline per subject and saves each one
     individually to disk immediately after processing. Never accumulates
@@ -187,6 +196,7 @@ def build_and_save_dataset(subject_ids: list[int],
         subject_ids: list of subject ids to process (1-9)
         save_dir: directory to save /subject files
         data_dir: directory w/ raw GDF files
+        exclude_map: ica components to reject for each subject as a dict (keys = subjects; vals = lst of indices)
 
     Returns:
         None
@@ -196,7 +206,7 @@ def build_and_save_dataset(subject_ids: list[int],
 
     for subject_id in subject_ids:
         print(f"processing subject {subject_id}...")
-        power, labels = load_subject(subject_id, data_dir)
+        power, labels = load_subject(subject_id, data_dir,  manual_exclude=exclude_map.get(subject_id, []))
         np.save(save_path / f"subject_{subject_id}_X.npy", power)
         np.save(save_path / f"subject_{subject_id}_y.npy", labels)
         print(f"subject {subject_id} saved -> {power.shape}")
