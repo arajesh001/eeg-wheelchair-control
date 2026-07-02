@@ -27,11 +27,16 @@ def log_normalize(power: np.ndarray) -> np.ndarray:
     Same array but log normalized. 
     """
     
-    epsilon = 1 * 10**(-10)
+    epsilon = 1e-10
     log_power = np.log(power + epsilon)
-    mean = log_power.mean(axis=-1, keepdims=True)
-    std = log_power.std(axis=-1, keepdims=True)
-    return (log_power - mean) / (std + epsilon)
+    mean = log_power.mean()
+    std = log_power.std()
+    return ((log_power - mean) / (std + epsilon)).astype(np.float32)
+
+def log_transform(power):
+    epsilon = 1e-10
+    return np.log(power + epsilon).astype(np.float32)
+
 
 
 def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
@@ -210,6 +215,11 @@ def build_and_save_dataset(subject_ids: list[int],
         np.save(save_path / f"subject_{subject_id}_X.npy", power)
         np.save(save_path / f"subject_{subject_id}_y.npy", labels)
         print(f"subject {subject_id} saved -> {power.shape}")
+
+
+# =============================================================================
+# CLASSES
+# =============================================================================
 
 # modifying dataloader so that it's one subject at a time -> make it easier on RAM
 # original concatenated np array was too much for Mac -> ~10 GB at a time
