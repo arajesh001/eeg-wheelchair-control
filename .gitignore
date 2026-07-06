@@ -222,3 +222,6 @@ __marimo__/
 processed/
 processed_small/
 processed_per_subject/
+processed_ICA_1-3/
+processed_global_norm/
+*.pt

@@ -2,6 +2,7 @@
 # IMPORTS
 # =============================================================================
 
+from pathlib import Path
 import torch
 import torch.nn as nn
 import numpy as np
@@ -246,13 +247,21 @@ def run_loso_optimized(subject_ids, input_type:str, n_epochs=50, batch_size=32, 
             print("Invalid input_type")
             return
         
-        optimizer = torch.optim.Adam(model.parameters(), lr=3e-5, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
 
         # adding early stopping
         best_loss = float('inf')
         counter = 0
         patience = 15
         tol = 0.001
+        warmup_epochs = 15
+        weights = Path(f"best_model_subject_{test_subj}.pt")
+
+        # delete if its there from previous runs
+        if weights.exists():
+            weights.unlink()
+    
+
         for epoch in range(n_epochs):
             avg_loss = train(model, train_loader, optimizer, loss_fn, device)
             val_loss = evaluate_loss(model, val_loader, device)
@@ -260,12 +269,25 @@ def run_loso_optimized(subject_ids, input_type:str, n_epochs=50, batch_size=32, 
 
             if val_loss < best_loss - tol:
                 best_loss = val_loss
+                # save the best weights into a temp file ONLY if enough learning has occured
+                if epoch + 1 > warmup_epochs:
+                    torch.save(model.state_dict(), weights)
                 counter = 0
+
             else:
                 counter += 1
             if counter >= patience:
                 print(f"[Subject {test_subj}] Early stopping at epoch {epoch+1}")
                 break
+        
+        
+        # load in the best weights rather than using most recent
+        if weights.exists():
+            state_dict = torch.load(weights, weights_only=True)
+            model.load_state_dict(state_dict)
+        # just use most recent in case the file DNE
+        else:
+            pass
 
         acc = evaluate(model, test_loader, device)
         print(f"[Subject {test_subj}] Accuracy: {acc:.4f}\n")
