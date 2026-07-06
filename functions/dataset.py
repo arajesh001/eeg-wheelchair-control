@@ -29,9 +29,9 @@ def log_normalize(power: np.ndarray) -> np.ndarray:
     
     epsilon = 1e-10
     log_power = np.log(power + epsilon)
-    mean = log_power.mean()
-    std = log_power.std()
-    return ((log_power - mean) / (std + epsilon)).astype(np.float32)
+    mean = log_power.mean(axis=(1,2,3), keepdims=True)
+    std = log_power.std(axis=(1,2,3), keepdims=True)
+    return (log_power - mean) / (std + epsilon)
 
 def log_transform(power):
     epsilon = 1e-10
