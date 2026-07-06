@@ -118,28 +118,7 @@ if __name__ == "__main__":
     # ^^ should be [8, 4]
 
 
-# =============================================================================
-# FUNCTIONS
-# =============================================================================
-
-def ndarray_to_tensor(X: np.ndarray) -> torch.Tensor:
-    # float32 -> required by Conv2d
-    return torch.from_numpy(X).float()
-
-def labels_to_tensor(y: np.ndarray) -> torch.Tensor:
-    # int64 -> required by CrossEntropyLoss (see train.py)
-    return torch.from_numpy(y).long()
-
-def get_device() -> torch.device:
-    # UPDATED FOR MORE OPTIONS
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
-    
-###### 
+###############################################################################
 
 
 class SpectrogramCNN(nn.Module):
@@ -228,3 +207,26 @@ if __name__ == "__main__":
     dummy = torch.randn(8, 22, 65, 626)
     out = model(dummy)
     print(out.shape)  # should be [8, 4]
+
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+def ndarray_to_tensor(X: np.ndarray) -> torch.Tensor:
+    # float32 -> required by Conv2d
+    return torch.from_numpy(X).float()
+
+def labels_to_tensor(y: np.ndarray) -> torch.Tensor:
+    # int64 -> required by CrossEntropyLoss (see train.py)
+    return torch.from_numpy(y).long()
+
+def get_device() -> torch.device:
+    # UPDATED FOR MORE OPTIONS
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+    
