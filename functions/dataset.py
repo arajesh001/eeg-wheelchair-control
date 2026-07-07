@@ -7,10 +7,12 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import mne
 import numpy as np
-
 import sys
 from pathlib import Path
+from sklearn.model_selection import train_test_split
+
 from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter, run_ica, apply_ica, epoch_raw, compute_tfr, get_motor_events, find_eog_artifacts
+
 
 # =============================================================================
 # FUNCTIONS
@@ -216,6 +218,27 @@ def build_and_save_dataset(subject_ids: list[int],
         np.save(save_path / f"subject_{subject_id}_y.npy", labels)
         print(f"subject {subject_id} saved -> {power.shape}")
 
+
+def get_calibration_split(X_test: np.ndarray, y_test: np.ndarray,
+                          calib_size: int = 20, random_state: int = 42
+                          ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Splits a held-out subject's trials into a small calibration subset
+    (used for fine-tuning) and a final test subset (used only for
+    evaluation), preserving class balance w/ stratified sampling.
+
+    Args:
+    X_test: np.ndarray [n_trials, 22, n_freqs, n_times] held-out subject's full trial set
+    y_test: np.ndarray [n_trials] integer class labels
+    calib_size: total number of trials to allocate to calibration (default 20)
+    random_state: seed for reproducible splitting
+
+    Returns:
+    X_calib, X_finaltest, y_calib, y_finaltest -> np.ndarrays
+    """
+    
+    X_calib, X_finaltest, y_calib, y_finaltest = train_test_split(X_test, y_test, train_size=calib_size, stratify=y_test)
+    return X_calib, X_finaltest, y_calib, y_finaltest
 
 # =============================================================================
 # CLASSES

@@ -2,4 +2,4 @@ Dataset was taken from BCI Competition IV, the link to the source is provided be
 
 URL: https://www.bbci.de/competition/
 
-Dataset Used: 2a -> 18 files; 9 *T (train) and 9 *E (test)
+Dataset Used: 2a -> 9 files; 9 Train files (*T)
