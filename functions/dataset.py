@@ -236,9 +236,13 @@ def get_calibration_split(X_test: np.ndarray, y_test: np.ndarray,
     Returns:
     X_calib, X_finaltest, y_calib, y_finaltest -> np.ndarrays
     """
+
+    if calib_size >= len(y_test):
+        raise ValueError(f"calib_size ({calib_size}) must be less than the total num trials ({len(y_test)}).")
     
-    X_calib, X_finaltest, y_calib, y_finaltest = train_test_split(X_test, y_test, train_size=calib_size, stratify=y_test)
+    X_calib, X_finaltest, y_calib, y_finaltest = train_test_split(X_test, y_test, train_size=calib_size, stratify=y_test, random_state=random_state)
     return X_calib, X_finaltest, y_calib, y_finaltest
+
 
 # =============================================================================
 # CLASSES
