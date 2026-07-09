@@ -8,7 +8,7 @@ import torch.nn as nn
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, random_split
 from model import EEG_CNN, ndarray_to_tensor, labels_to_tensor, get_device, SpectrogramCNN
-from dataset import get_loso_split, EEGDataset
+from dataset import get_loso_split, EEGDataset, get_calibration_split
 
 # =============================================================================
 # LOSS FUNCTION
@@ -296,3 +296,92 @@ def run_loso_optimized(subject_ids, input_type:str, n_epochs=50, batch_size=32, 
     mean_acc = sum(accuracies) / len(accuracies)
     print(f"Mean LOSO Accuracy: {mean_acc:.4f}")
     return accuracies, mean_acc
+
+
+def calibrate_subject(subject_id: int, input_type: str, 
+                      data_dir: str = "processed_global_norm",
+                      weights_dir: str = ".", calib_size: int = 20,
+                      n_epochs: int = 10, lr: float = 1e-6,
+                      freeze_early_layers: bool = True,
+                      random_state: int = 42) -> float:
+    """
+    Loads the LOSO-trained model for a held-out subject, fine-tunes it on a
+    small calibration subset of that subject's own trials, and evaluates on
+    the remaining trials.
+
+    Args:
+    subject_id: subject id this checkpoint was held out for
+    input_type: "spec" or "time" 
+    data_dir: dir w/ per-subject saved .npy files
+    weights_dir: dir w/ best_model_subject_{id}.pt checkpoints
+    calib_size: num trials to use for calibration (rest -> final test)
+    n_epochs: num of fine-tuning epochs over the calibration set
+    lr: learning rate -> fine-tuning
+    freeze_early_layers: if True, freezes freq_conv/freq_bn and temp_conv/temp_bn,
+                    leaving only spat_conv/spat_bn and classifier trainable
+    random_state: seed for the calibration/test split
+
+    Returns:
+    Final test accuracy on the held-out (non-calibration) trials, as a decimal
+    """
+
+    device = get_device()
+
+    
+    #load the subject's saved X and y files from data_dir
+
+    X = np.load(Path(data_dir) / f"subject_{subject_id}_X.npy")
+    y = np.load(Path(data_dir) / f"subject_{subject_id}_y.npy")
+
+    #get X_calib, X_finaltest, y_calib, y_finaltest
+
+    X_calib, X_finaltest, y_calib, y_finaltest = get_calibration_split(X, y, calib_size=calib_size, random_state=random_state)
+
+    # instantiate SpectrogramCNN, load state dict
+
+    if input_type == "spec":
+            model = SpectrogramCNN().to(device)
+    elif input_type == "time":
+        model = EEG_CNN().to(device)
+    else:
+        print("Invalid input_type")
+        return 0
+    
+    weights = Path(weights_dir) / f"best_model_subject_{subject_id}.pt"
+    if weights.exists():
+            state_dict = torch.load(weights, weights_only=True)
+            model.load_state_dict(state_dict)
+        # just use most recent in case the file DNE
+    else:
+        raise FileNotFoundError("No state dictionary found")
+
+    # if freeze_early_layers, loop model.named_parameters() and set
+    #requires_grad=False for names starting with "freq_" or "temp_"
+
+    if freeze_early_layers:
+        for pair  in model.named_parameters():
+            if pair[0].startswith(("freq_", "temp_")):
+                pair[1].requires_grad = False
+
+    #build an AdamW optimizer over params that have grad false
+
+
+    optimizer = torch.optim.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+          lr=lr)
+
+
+    #build calibration and final-test dataloaders
+
+    train_loader = make_dataloader(X_calib, y_calib, shuffle=True)
+    test_loader  = make_dataloader(X_finaltest,  y_finaltest, shuffle=False)
+
+    #run n_epochs of train() on the calibration loader
+
+    for epoch in range(1, n_epochs + 1):
+            loss = train(model, train_loader, optimizer, loss_fn, device)
+            print(f"Epoch: {epoch}/{n_epochs} | Loss: {loss}")
+        
+    # return evaluate on the final-test loader
+
+    return evaluate(model, test_loader, device)
