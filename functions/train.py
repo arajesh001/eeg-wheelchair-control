@@ -330,8 +330,8 @@ def calibrate_subject(subject_id: int, input_type: str,
     
     #load the subject's saved X and y files from data_dir
 
-    X = np.load(Path(data_dir) / f"subject_{subject_id}_X.npy")
-    y = np.load(Path(data_dir) / f"subject_{subject_id}_y.npy")
+    X = np.load(Path.cwd().parent / Path("data") / Path(data_dir) / f"subject_{subject_id}_X.npy")
+    y = np.load(Path.cwd().parent / Path("data") / Path(data_dir) / f"subject_{subject_id}_y.npy")
 
     #get X_calib, X_finaltest, y_calib, y_finaltest
 
