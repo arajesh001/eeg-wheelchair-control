@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 
-from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter, run_ica, apply_ica, epoch_raw, compute_tfr, get_motor_events, find_eog_artifacts
+from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter, run_ica, \
+    apply_ica, epoch_raw, compute_tfr, get_motor_events, find_eog_artifacts, extract_raw_epochs
 
 
 # =============================================================================
@@ -63,7 +64,7 @@ def normalize_raw(data: np.ndarray) -> np.ndarray:
     return ans.astype(np.float32)
 
 
-def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
+def load_subject(subject_id: int, input_type:str = "spec", data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
     """
     Applies full signal processing pipeline (from pipeline.ipynb) to any subject
     in the dataset that is of a "T" (training) file type.
@@ -107,12 +108,17 @@ def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf", manual_exclud
     # epoching the data
     raw_epochs = epoch_raw(raw_clean, events, event_id)
 
-    # obtaining power and labels using tfr func
-    power, labels = compute_tfr(raw_epochs)
-
-    # final tensor log normalized 
-    final_tensor = log_normalize(power).astype(np.float32)
-
+    if input_type == "spec":
+        # obtaining power and labels using tfr func
+        power, labels = compute_tfr(raw_epochs)
+        # final tensor log normalized 
+        final_tensor = log_normalize(power).astype(np.float32)
+    elif input_type == "time":
+        # get the time series data and labels
+        data, labels = extract_raw_epochs(raw_epochs)
+        # normalize 
+        final_tensor = normalize_raw(data).astype(np.float32)
+        
     return final_tensor, labels
 
 def build_dataset(subject_ids: list[int], data_dir: str = "BCICIV_2a_gdf") -> tuple[np.ndarray, np.ndarray, np.ndarray]:
