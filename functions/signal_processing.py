@@ -172,6 +172,9 @@ def epoch_raw(raw: mne.io.Raw, events: np.ndarray, event_id: dict,
     )
     return epochs
 
+
+
+# USE THIS FOR SPECTOGRAM CNN
 def compute_tfr(epochs: mne.Epochs,
                 fmin: float = 8.0,
                 fmax: float = 30.0,
@@ -220,6 +223,8 @@ def compute_tfr(epochs: mne.Epochs,
 
     return power, labels
 
+
+# USE THIS FOR EEG CNN
 def extract_raw_epochs(epochs: mne.Epochs) -> tuple[np.ndarray, np.ndarray]:
     """
     Extracts raw EEG time series data from an Epochs object w/o
