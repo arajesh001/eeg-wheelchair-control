@@ -18,6 +18,7 @@ from signal_processing import load_raw_gdf, rename_and_montage, bandpass_filter,
 # FUNCTIONS
 # =============================================================================
 
+# USE FOR SPEC CNN
 def log_normalize(power: np.ndarray) -> np.ndarray:
     """
     Applies per triplet log normalization to a power array. 
@@ -39,6 +40,27 @@ def log_transform(power):
     epsilon = 1e-10
     return np.log(power + epsilon).astype(np.float32)
 
+
+# USE FOR EEG CNN
+def normalize_raw(data: np.ndarray) -> np.ndarray:
+    """
+    Applies per-channel per-trial standardization to raw EEG voltage data.
+    No log transform —> raw voltage alr centered ~ 0.
+
+    Args:
+        data: np.ndarray [n_trials, 22, n_timepoints]
+
+    Returns:
+        Standardized array of same shape, dtype float32
+    """
+
+    epsilon = 1e-10
+    mean = data.mean(axis=2, keepdims=True)
+    std = data.std(axis=2, keepdims=True)
+
+    ans = (data - mean) / (std + epsilon)
+    
+    return ans.astype(np.float32)
 
 
 def load_subject(subject_id: int, data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
