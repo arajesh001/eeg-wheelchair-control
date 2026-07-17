@@ -211,8 +211,37 @@ def compute_tfr(epochs: mne.Epochs,
     power = power[:, :, :, time_mask]
 
     # integer labels: left=0, right=1, feet=2, tongue=3
+    # Map raw event codes -> string names -> clean 0-3 labels
+    id_to_name = {v: k for k, v in epochs.event_id.items()}
     label_map = {'left_hand': 0, 'right_hand': 1, 'feet': 2, 'tongue': 3}
-    labels = epochs.events[:, 2] - epochs.events[:, 2].min()
+    
+    raw_ids = epochs.events[:, 2]
+    labels = np.array([label_map[id_to_name[raw_id]] for raw_id in raw_ids])
 
     return power, labels
+
+def extract_raw_epochs(epochs: mne.Epochs) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Extracts raw EEG time series data from an Epochs object w/o
+    time-freq transformation.
+
+    Args:
+        epochs: mne.Epochs object [n_epochs, 22, n_timepoints]
+
+    Returns:
+        data:np.ndarray [n_epochs, 22, n_timepoints] raw voltage values
+        labels: np.ndarray [n_epochs] integer class labels (0-3)
+    """
+
+    # shape should be [n_epochs, 22, n_timepoints]
+    data = epochs.get_data()
+
+    # Map raw event codes -> string names -> clean 0-3 labels
+    id_to_name = {v: k for k, v in epochs.event_id.items()}
+    label_map = {'left_hand': 0, 'right_hand': 1, 'feet': 2, 'tongue': 3}
+    
+    raw_ids = epochs.events[:, 2]
+    labels = np.array([label_map[id_to_name[raw_id]] for raw_id in raw_ids])
+
+    return data, labels
 
