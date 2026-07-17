@@ -225,13 +225,17 @@ def compute_tfr(epochs: mne.Epochs,
 
 
 # USE THIS FOR EEG CNN
-def extract_raw_epochs(epochs: mne.Epochs) -> tuple[np.ndarray, np.ndarray]:
+def extract_raw_epochs(epochs: mne.Epochs,
+                       tmin_crop: float = 0.5,
+                        tmax_crop: float = 2.5) -> tuple[np.ndarray, np.ndarray]:
     """
     Extracts raw EEG time series data from an Epochs object w/o
     time-freq transformation.
 
     Args:
         epochs: mne.Epochs object [n_epochs, 22, n_timepoints]
+        tmin_crop: crop start 
+        tmax_crop: crop end 
 
     Returns:
         data:np.ndarray [n_epochs, 22, n_timepoints] raw voltage values
@@ -240,6 +244,11 @@ def extract_raw_epochs(epochs: mne.Epochs) -> tuple[np.ndarray, np.ndarray]:
 
     # shape should be [n_epochs, 22, n_timepoints]
     data = epochs.get_data()
+
+    # crop edge artifacts along time axis
+    times = epochs.times
+    time_mask = (times >= tmin_crop) & (times <= tmax_crop)
+    data = data[:, :, time_mask]
 
     # Map raw event codes -> string names -> clean 0-3 labels
     id_to_name = {v: k for k, v in epochs.event_id.items()}
