@@ -247,6 +247,37 @@ def build_and_save_dataset(subject_ids: list[int],
         print(f"subject {subject_id} saved -> {power.shape}")
 
 
+def build_and_save_raw(subject_ids: list[int],
+                       save_dir: str,
+                       data_dir: str = "BCICIV_2a_gdf",
+                       exclude_map: dict = {}) -> None:
+    """
+    Runs the raw time series preprocessing pipeline per subject and saves
+    each one individually to disk. Mirror of build_and_save_dataset but
+    calls load_subject_raw instead of load_subject.
+
+    Args:
+        subject_ids: list of subject ids to process (1-9)
+        save_dir:directory to save subject files
+        data_dir: directory w/ raw GDF files
+        exclude_map: ICA components to reject per subject
+
+    Returns:
+        None
+    """
+    save_path = Path(save_dir)
+    save_path.mkdir(exist_ok=True)
+
+    for subject_id in subject_ids:
+        print(f"processing subject {subject_id}...")
+        data, labels = load_subject(subject_id, input_type="time", data_dir=data_dir ,manual_exclude=exclude_map.get(subject_id, []))
+        np.save(save_path / f"subject_{subject_id}_X.npy", data)
+        np.save(save_path / f"subject_{subject_id}_y.npy", labels)
+        print(f"subject {subject_id} saved -> {data.shape}")
+
+    return
+
+
 def get_calibration_split(X_test: np.ndarray, y_test: np.ndarray,
                           calib_size: int = 20, random_state: int = 42
                           ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
