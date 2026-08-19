@@ -56,22 +56,22 @@ def rename_and_montage(raw:mne.io.Raw)->None:
 # PREPROCESSING
 # =============================================================================
 
-def bandpass_filter(raw:mne.io.Raw, low, high, print:bool)->None:
+def bandpass_filter(raw:mne.io.Raw, low, high, verbose:bool)->None:
     """
-    Bandpasses the data to the frequency range [low, high] using a order 5 IIR butterworth filter. 
+    Bandpasses the data to the frequency range [low, high] using a order 5 IIR butterworth filter.
 
     Args:
-    raw: mne.io.Raw type that needs to be bandpassed 
+    raw: mne.io.Raw type that needs to be bandpassed
     low: lower bound frequency (Hz)
     high: upper bound frequency (Hz)
-    print: bool which controls if outputs are printed
+    verbose: bool which controls if outputs are printed
 
     Returns:
     None
 
     """
-    raw.filter(l_freq=low, h_freq=high, method='iir', 
-               iir_params=dict(order=5, ftype='butter'), verbose=print)
+    raw.filter(l_freq=low, h_freq=high, method='iir',
+               iir_params=dict(order=5, ftype='butter'), verbose=verbose)
     return
 
 def run_ica(raw:mne.io.Raw, n_components:int)->mne.preprocessing.ICA:
