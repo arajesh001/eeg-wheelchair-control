@@ -64,7 +64,7 @@ def normalize_raw(data: np.ndarray) -> np.ndarray:
     return ans.astype(np.float32)
 
 
-def load_subject(subject_id: int, input_type:str = "spec", data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = []) -> tuple[np.ndarray, np.ndarray]:
+def load_subject(subject_id: int, input_type:str = "spec", data_dir: str = "BCICIV_2a_gdf", manual_exclude: list[int] = None) -> tuple[np.ndarray, np.ndarray]:
     """
     Applies full signal processing pipeline (from pipeline.ipynb) to any subject
     in the dataset that is of a "T" (training) file type.
@@ -73,6 +73,9 @@ def load_subject(subject_id: int, input_type:str = "spec", data_dir: str = "BCIC
     subject_id: which of the 9 subjects we need/ 
     data_dir: default dir is BCICIV_2a_gdf. 
     """
+
+    if manual_exclude is None:
+        manual_exclude = []
 
     # make filename
     filename = f"A0{subject_id}T.gdf"
@@ -93,8 +96,6 @@ def load_subject(subject_id: int, input_type:str = "spec", data_dir: str = "BCIC
     # find bad channels
     eog_indices = find_eog_artifacts(ica, raw)
 
-    # IMPORTANT: apply_ica W/O dropping any componenets -> optimize later 
-    # after pipeline works since it requires manual inspection
     all_excludes = list(set(eog_indices + manual_exclude))
     print(f"Subject {subject_id} | auto: {eog_indices} | manual: {manual_exclude} | rejecting: {all_excludes}")
     raw_clean = apply_ica(ica, raw, all_excludes)
@@ -218,10 +219,10 @@ def get_loso_split(X: np.ndarray, y: np.ndarray, subjects: np.ndarray,
 
     return X_train, X_test, y_train, y_test
 
-def build_and_save_dataset(subject_ids: list[int], 
+def build_and_save_dataset(subject_ids: list[int],
                            save_dir: str,
                            data_dir: str = "BCICIV_2a_gdf",
-                           exclude_map: dict = {}) -> None:
+                           exclude_map: dict = None) -> None:
     """
     Runs the full preprocessing pipeline per subject and saves each one
     individually to disk immediately after processing. Never accumulates
@@ -236,6 +237,9 @@ def build_and_save_dataset(subject_ids: list[int],
     Returns:
         None
     """
+    if exclude_map is None:
+        exclude_map = {}
+
     save_path = Path(save_dir)
     save_path.mkdir(exist_ok=True)
 
@@ -250,7 +254,7 @@ def build_and_save_dataset(subject_ids: list[int],
 def build_and_save_raw(subject_ids: list[int],
                        save_dir: str,
                        data_dir: str = "BCICIV_2a_gdf",
-                       exclude_map: dict = {}) -> None:
+                       exclude_map: dict = None) -> None:
     """
     Runs the raw time series preprocessing pipeline per subject and saves
     each one individually to disk. Mirror of build_and_save_dataset but
@@ -265,6 +269,9 @@ def build_and_save_raw(subject_ids: list[int],
     Returns:
         None
     """
+    if exclude_map is None:
+        exclude_map = {}
+
     save_path = Path(save_dir)
     save_path.mkdir(exist_ok=True)
 
