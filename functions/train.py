@@ -269,14 +269,12 @@ def run_loso_optimized(subject_ids, input_type:str, n_epochs=50, batch_size=32, 
 
             if val_loss < best_loss - tol:
                 best_loss = val_loss
-                # save the best weights into a temp file ONLY if enough learning has occured
-                if epoch + 1 > warmup_epochs:
-                    torch.save(model.state_dict(), weights)
+                torch.save(model.state_dict(), weights)
                 counter = 0
 
             else:
                 counter += 1
-            if counter >= patience:
+            if epoch + 1 > warmup_epochs and counter >= patience:
                 print(f"[Subject {test_subj}] Early stopping at epoch {epoch+1}")
                 break
         
